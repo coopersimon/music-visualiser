@@ -1,0 +1,13 @@
+[package]
+name = "visualiser"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+clap = { version = "4.5", features = ["derive"] }
+chrono = "0.4"
+wgpu = "26.0"
+winit = "0.30"
+bytemuck = "1.23"
+rodio = { version = "0.21.1", features = ["symphonia"] }
+futures = "0.3.31"

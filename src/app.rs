@@ -1,0 +1,68 @@
+
+use winit::{
+    application::ApplicationHandler, dpi::{
+        LogicalSize, Size
+    }, event::{
+        WindowEvent
+    }, window::Window
+};
+
+use crate::renderer::{Renderer, Surface};
+
+/// State of the active window.
+struct WindowState {
+    window:         std::sync::Arc<Window>,
+    surface:        Surface,
+}
+
+/// Runtime state of the Application.
+pub struct App {
+    renderer: Renderer,
+    window: Option<WindowState>
+}
+
+impl App {
+    pub fn new(renderer: Renderer) -> Self {
+        Self {
+            renderer,
+            window: None
+        }
+    }
+}
+
+impl ApplicationHandler for App {
+    fn resumed(&mut self, event_loop: &winit::event_loop::ActiveEventLoop) {
+        let window_attrs = Window::default_attributes()
+            .with_inner_size(Size::Logical(LogicalSize{width: 1080.0, height: 720.0}))
+            .with_title("Visualiser");
+        let window = std::sync::Arc::new(event_loop.create_window(window_attrs).unwrap());
+
+        let surface = self.renderer.create_surface(window.clone());
+
+        self.window = Some(WindowState {
+            window, surface
+        });
+    }
+
+    fn window_event(
+        &mut self,
+        event_loop: &winit::event_loop::ActiveEventLoop,
+        _window_id: winit::window::WindowId,
+        event: WindowEvent,
+    ) {
+        match event {
+            WindowEvent::CloseRequested => {
+                event_loop.exit();
+            },
+            WindowEvent::Resized(size) => {
+                self.renderer.resize_surface(
+                    &mut self.window.as_mut().unwrap().surface,
+                    size.width, size.height);
+            },
+            WindowEvent::RedrawRequested => {
+                // TODO.
+            },
+            _ => {},
+        }
+    }
+}
