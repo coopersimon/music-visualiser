@@ -8,6 +8,6 @@ clap = { version = "4.5", features = ["derive"] }
 chrono = "0.4"
 wgpu = "26.0"
 winit = "0.30"
-bytemuck = "1.23"
-rodio = { version = "0.21.1", features = ["symphonia"] }
+bytemuck = { version = "1.23", features = ["derive"] }
+rodio = { version = "0.21.1", features = ["symphonia-all"] }
 futures = "0.3.31"

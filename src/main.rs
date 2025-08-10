@@ -1,10 +1,8 @@
 mod app;
 mod renderer;
+mod audio;
 
 use winit::event_loop::EventLoop;
-
-use std::fs::File;
-use rodio::{Decoder, OutputStream, source::Source};
 
 use clap::Parser;
 
@@ -18,12 +16,10 @@ struct Args {
 fn main() {
     let args = Args::parse();
 
-    let stream_handle = rodio::OutputStreamBuilder::open_default_stream()
-        .expect("could not open stream");
-    let file = File::open(args.audio).expect("couldn't open audio file");
-    let source = Decoder::try_from(file).unwrap();
+    let audio_source = audio::AudioSource::from_file(&args.audio);
 
-    let channel_count = source.channels();
+    let audio_player = audio::AudioPlayer::new();
+    audio_player.play(&audio_source);
 
     let renderer = renderer::Renderer::new();
 

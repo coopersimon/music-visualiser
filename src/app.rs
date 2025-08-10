@@ -7,12 +7,12 @@ use winit::{
     }, window::Window
 };
 
-use crate::renderer::{Renderer, Surface};
+use crate::renderer::{Renderer, Surface, Renderable};
 
 /// State of the active window.
 struct WindowState {
-    window:         std::sync::Arc<Window>,
-    surface:        Surface,
+    window:  std::sync::Arc<Window>,
+    surface: Surface,
 }
 
 /// Runtime state of the Application.
@@ -60,7 +60,24 @@ impl ApplicationHandler for App {
                     size.width, size.height);
             },
             WindowEvent::RedrawRequested => {
-                // TODO.
+                let window_size = self.window.as_ref().unwrap().window.inner_size();
+                let aspect_ratio = (window_size.width as f32) / (window_size.height as f32);
+
+                // TODO: collect audio data
+                // update renderables
+
+                let mut render_pass = self.renderer.new_render_pass(&mut self.window.as_mut().unwrap().surface);
+                render_pass.begin(wgpu::Color::WHITE);
+
+                // temporary test data.
+                let mut circle = crate::renderer::circle::CircleRenderable::new(&self.renderer);
+                let params = crate::renderer::circle::CircleParams {aspect_ratio, x_pos: 0.0, y_pos: 0.0, radius: 0.2, color: [1.0, 0.0, 0.0]};
+                circle.update(&params, &self.renderer);
+                circle.draw(&mut render_pass);
+
+                render_pass.finish();
+
+                self.window.as_ref().unwrap().window.request_redraw();
             },
             _ => {},
         }
