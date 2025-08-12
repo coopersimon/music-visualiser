@@ -1,4 +1,3 @@
-
 use winit::{
     application::ApplicationHandler, dpi::{
         LogicalSize, Size
@@ -7,7 +6,10 @@ use winit::{
     }, window::Window
 };
 
-use crate::renderer::{Renderer, Surface, Renderable};
+use crate::{
+    audio::AudioSource,
+    renderer::{Renderable, Renderer, Surface}
+};
 
 /// State of the active window.
 struct WindowState {
@@ -18,13 +20,17 @@ struct WindowState {
 /// Runtime state of the Application.
 pub struct App {
     renderer: Renderer,
+    audio_source: AudioSource,
+    render_list: Vec<Box<dyn Renderable>>,
     window: Option<WindowState>
 }
 
 impl App {
-    pub fn new(renderer: Renderer) -> Self {
+    pub fn new(renderer: Renderer, audio_source: AudioSource, render_list: Vec<Box<dyn Renderable>>) -> Self {
         Self {
             renderer,
+            audio_source,
+            render_list,
             window: None
         }
     }
@@ -63,17 +69,15 @@ impl ApplicationHandler for App {
                 let window_size = self.window.as_ref().unwrap().window.inner_size();
                 let aspect_ratio = (window_size.width as f32) / (window_size.height as f32);
 
-                // TODO: collect audio data
-                // update renderables
+                let audio_packet = self.audio_source.get_frame_data();
 
                 let mut render_pass = self.renderer.new_render_pass(&mut self.window.as_mut().unwrap().surface);
                 render_pass.begin(wgpu::Color::WHITE);
 
-                // temporary test data.
-                let mut circle = crate::renderer::circle::CircleRenderable::new(&self.renderer);
-                let params = crate::renderer::circle::CircleParams {aspect_ratio, x_pos: 0.0, y_pos: 0.0, radius: 0.2, color: [1.0, 0.0, 0.0]};
-                circle.update(&params, &self.renderer);
-                circle.draw(&mut render_pass);
+                for renderable in &mut self.render_list {
+                    renderable.update(&audio_packet, &self.renderer, aspect_ratio);
+                    renderable.draw(&mut render_pass);
+                }
 
                 render_pass.finish();
 

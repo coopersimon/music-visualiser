@@ -5,7 +5,9 @@ use std::io::BufReader;
 
 /// An audio source file.
 pub struct AudioSource {
-    buffer: Buffered<Decoder<BufReader<File>>>
+    buffer: Buffered<Decoder<BufReader<File>>>,
+
+    // TODO: internal buffers.
 }
 
 impl AudioSource {
@@ -21,7 +23,45 @@ impl AudioSource {
             buffer
         }
     }
+
+    pub fn get_frame_data(&mut self) -> AudioPacket {
+        // TODO: pre-calc.
+        let fps = self.buffer.sample_rate() / 60;
+        let frame_size = (self.buffer.channels() as u32) * fps;
+
+        let amplitude = self.buffer.by_ref()
+            .take(frame_size as usize)
+            .reduce(|acc, n| acc + n.abs())
+            .unwrap() / (frame_size as f32);
+
+        AudioPacket {
+            amplitude
+        }
+    }
 }
+
+/// Audio data for a single frame.
+pub struct AudioPacket {
+    amplitude: f32
+}
+
+impl AudioPacket {
+    pub fn get_param(&self, param: AudioParam) -> f32 {
+        use AudioParam::*;
+        match param {
+            Amplitude => self.amplitude
+        }
+    }
+}
+
+#[derive(Clone, Copy)]
+pub enum AudioParam {
+    Amplitude
+}
+
+/*pub struct AudioParam {
+    amplitude: f32
+}*/
 
 /// Handles playback of the audio source to speakers.
 pub struct AudioPlayer {

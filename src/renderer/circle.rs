@@ -1,11 +1,16 @@
 use bytemuck::{Zeroable, Pod};
 
-use super::{Renderer, RenderPass, Renderable};
+use super::{Renderer, RenderPass, Renderable, RenderParam};
+use crate::{
+    operation::Mapping,
+    audio::AudioPacket
+};
 
 const CIRCLE_SIZE: usize = 90;
 
 /// An instance of a circle.
 pub struct CircleRenderable {
+    mapping: Mapping,
     pipeline: wgpu::RenderPipeline,
     vertex_buffer: wgpu::Buffer,
     uniform_buffer: wgpu::Buffer,
@@ -79,7 +84,7 @@ impl CircleRenderable {
     }
 
     /// Create a new circle to display on-screen.
-    pub fn new(renderer: &Renderer) -> Self {
+    pub fn new(mapping: Mapping, renderer: &Renderer) -> Self {
         let vertex_buffer = renderer.device.create_buffer(&wgpu::BufferDescriptor {
             label: None,
             size: (std::mem::size_of::<Vertex>() * (CIRCLE_SIZE + 1)) as u64,
@@ -105,6 +110,7 @@ impl CircleRenderable {
             ]
         });
         Self {
+            mapping,
             pipeline,
             vertex_buffer,
             uniform_buffer,
@@ -114,25 +120,27 @@ impl CircleRenderable {
 }
 
 impl Renderable for CircleRenderable {
-    type Params = CircleParams;
-
     /// Update the circle with new parameters.
-    fn update(&mut self, params: &Self::Params, renderer: &Renderer) {
-        // TODO: compute shader to generate vertices?
-
+    fn update(&mut self, audio_packet: &AudioPacket, renderer: &Renderer, aspect_ratio: f32) {
+        let x = self.mapping[&RenderParam::X].eval(audio_packet);
+        let y = self.mapping[&RenderParam::Y].eval(audio_packet);
+        let radius = self.mapping[&RenderParam::Radius].eval(audio_packet);
         // Update vertex buffer.
-        // TODO: don't realloc every time.
+        // TODO: do this in vertex shader...
         let mut buf = Vec::new();
         for step in 0..=CIRCLE_SIZE {
             let radians = (step as f32) / (CIRCLE_SIZE as f32) * (2.0 * std::f32::consts::PI);
-            let x = params.x_pos + params.radius * radians.sin();
-            let y = params.y_pos + params.radius * radians.cos() * params.aspect_ratio;
+            let x = x + radius * radians.sin();
+            let y = y + radius * radians.cos() * aspect_ratio;
             buf.push(Vertex{pos: [x, y]});
         }
         renderer.queue.write_buffer(&self.vertex_buffer, 0, bytemuck::cast_slice(&buf));
 
         // Update binding data
-        let color_buffer: [f32; 4] = [params.color[0], params.color[1], params.color[2], 1.0];
+        let r = self.mapping[&RenderParam::R].eval(audio_packet);
+        let g = self.mapping[&RenderParam::G].eval(audio_packet);
+        let b = self.mapping[&RenderParam::B].eval(audio_packet);
+        let color_buffer: [f32; 4] = [r, g, b, 1.0];
         renderer.queue.write_buffer(&self.uniform_buffer, 0, bytemuck::cast_slice(&color_buffer));
     }
 
@@ -147,7 +155,7 @@ impl Renderable for CircleRenderable {
     }
 }
 
-pub struct CircleParams {
+/*pub struct CircleParams {
     pub aspect_ratio: f32,
 
     pub x_pos: f32,
@@ -155,7 +163,7 @@ pub struct CircleParams {
     pub radius: f32,
     //pub line_thickness: f32,
     pub color: [f32; 3]
-}
+}*/
 
 #[derive(Zeroable, Pod, Clone, Copy)]
 #[repr(C)]

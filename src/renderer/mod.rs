@@ -6,6 +6,7 @@ use std::{
     cell::RefCell,
     collections::HashMap
 };
+use crate::audio::AudioPacket;
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
 pub enum RenderableType {
@@ -124,15 +125,6 @@ impl<'a> RenderPass<'a> {
         self.render_pass = Some(render_pass.forget_lifetime());
     }
 
-    ///
-    /*pub fn draw_circle(&mut self, params: &CircleParams) {
-        // TODO.
-        let render_pass = self.render_pass.as_mut().expect("must begin render pass before use!");
-        render_pass.set_pipeline(self.renderer.get_circle_pipeline());
-        //render_pass.set_vertex_buffer(slot, buffer_slice);
-        //render_pass.draw();
-    }*/
-
     // TODO: move this to drop?
     /// End the render pass, submit to queue, and present.
     pub fn finish(mut self) {
@@ -159,10 +151,19 @@ impl Surface {
     }
 }
 
-pub trait Renderable {
-    type Params;
+#[derive(Clone, Copy, PartialEq, Eq, Hash)]
+pub enum RenderParam {
+    X,
+    Y,
+    R,
+    G,
+    B,
+    Radius,
+}
 
-    fn update(&mut self, params: &Self::Params, renderer: &Renderer);
+pub trait Renderable {
+    // TODO: store graphics params somewhere?
+    fn update(&mut self, audio_packet: &AudioPacket, renderer: &Renderer, aspect_ratio: f32);
 
     fn draw(&self, render_pass: &mut RenderPass<'_>);
 }
