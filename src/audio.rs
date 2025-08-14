@@ -3,11 +3,12 @@ use std::fs::File;
 use rodio::{Sink, Decoder, OutputStream, source::Source, source::Buffered};
 use std::io::BufReader;
 
+const FRAME_SIZE: f32 = 0.5; // seconds
+
 /// An audio source file.
 pub struct AudioSource {
     buffer: Buffered<Decoder<BufReader<File>>>,
-
-    // TODO: internal buffers.
+    frame_count: f32,
 }
 
 impl AudioSource {
@@ -16,23 +17,31 @@ impl AudioSource {
         let file = File::open(path).expect("couldn't open audio file");
         let source = Decoder::try_from(file).unwrap();
 
-        //let channel_count = source.channels();
         let buffer = source.buffered();
+        let frame_count = (buffer.sample_rate() as f32) * FRAME_SIZE;
 
         Self {
-            buffer
+            buffer,
+            frame_count
         }
     }
 
-    pub fn get_frame_data(&mut self) -> AudioPacket {
-        // TODO: pre-calc.
-        let fps = self.buffer.sample_rate() / 60;
-        let frame_size = (self.buffer.channels() as u32) * fps;
+    /// Get a frame of audio for a specified time in the song, defined in seconds.
+    pub fn get_frame_data(&mut self, seconds: f32) -> AudioPacket {
+        let start_time = seconds - FRAME_SIZE * 0.5;
+        let frame_count = (self.frame_count - start_time.min(0.0)).round() as usize;
+        let frame_start = ((self.buffer.sample_rate() as f32) * start_time.max(0.0)).round() as usize;
 
-        let amplitude = self.buffer.by_ref()
-            .take(frame_size as usize)
+        let channel_count = self.buffer.channels() as usize;
+
+        let buffer = self.buffer.clone()
+            .skip(frame_start * channel_count)
+            .take(frame_count * channel_count);
+        let buffer_size = buffer.size_hint().1.unwrap_or(frame_count);
+
+        let amplitude = buffer
             .reduce(|acc, n| acc + n.abs())
-            .unwrap() / (frame_size as f32);
+            .unwrap() / (buffer_size as f32);
 
         AudioPacket {
             amplitude
@@ -59,14 +68,10 @@ pub enum AudioParam {
     Amplitude
 }
 
-/*pub struct AudioParam {
-    amplitude: f32
-}*/
-
 /// Handles playback of the audio source to speakers.
 pub struct AudioPlayer {
     output: OutputStream,
-    sink: Sink
+    _sink: Sink
 }
 
 impl AudioPlayer {
@@ -77,7 +82,7 @@ impl AudioPlayer {
 
         Self {
             output: stream_handle,
-            sink
+            _sink: sink
         }
     }
 

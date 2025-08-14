@@ -22,7 +22,9 @@ pub struct App {
     renderer: Renderer,
     audio_source: AudioSource,
     render_list: Vec<Box<dyn Renderable>>,
-    window: Option<WindowState>
+    window: Option<WindowState>,
+
+    start_time: chrono::DateTime<chrono::Utc>,
 }
 
 impl App {
@@ -31,7 +33,9 @@ impl App {
             renderer,
             audio_source,
             render_list,
-            window: None
+            window: None,
+
+            start_time: chrono::Utc::now()
         }
     }
 }
@@ -66,10 +70,13 @@ impl ApplicationHandler for App {
                     size.width, size.height);
             },
             WindowEvent::RedrawRequested => {
+                let frame_time = chrono::Utc::now();
+                let time = frame_time - self.start_time;
+
                 let window_size = self.window.as_ref().unwrap().window.inner_size();
                 let aspect_ratio = (window_size.width as f32) / (window_size.height as f32);
 
-                let audio_packet = self.audio_source.get_frame_data();
+                let audio_packet = self.audio_source.get_frame_data(time.as_seconds_f32());
 
                 let mut render_pass = self.renderer.new_render_pass(&mut self.window.as_mut().unwrap().surface);
                 render_pass.begin(wgpu::Color::WHITE);

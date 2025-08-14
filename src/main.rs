@@ -34,7 +34,8 @@ fn main() {
         Box::new(renderer::circle::CircleRenderable::new(Mapping::from([
             (X, Const(0.0)),
             (Y, Const(0.0)),
-            (Radius, Mul(Box::new(Param(AudioParam::Amplitude)), Box::new(Const(3.0)))),
+            (Radius, Mul(Param(AudioParam::Amplitude).into(), Const(1.5).into())),
+            (LineWidth, Const(0.01)),
             (R, Const(1.0)),
             (G, Const(0.0)),
             (B, Const(0.0))

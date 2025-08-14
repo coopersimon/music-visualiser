@@ -159,6 +159,7 @@ pub enum RenderParam {
     G,
     B,
     Radius,
+    LineWidth
 }
 
 pub trait Renderable {

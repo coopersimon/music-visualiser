@@ -1,4 +1,5 @@
 use bytemuck::{Zeroable, Pod};
+use wgpu::util::DeviceExt;
 
 use super::{Renderer, RenderPass, Renderable, RenderParam};
 use crate::{
@@ -7,6 +8,7 @@ use crate::{
 };
 
 const CIRCLE_SIZE: usize = 90;
+const VERTEX_COUNT: usize = (CIRCLE_SIZE + 1) * 2;
 
 /// An instance of a circle.
 pub struct CircleRenderable {
@@ -24,7 +26,7 @@ impl CircleRenderable {
             entries: &[
                 wgpu::BindGroupLayoutEntry {
                     binding: 0,
-                    visibility: wgpu::ShaderStages::FRAGMENT,
+                    visibility: wgpu::ShaderStages::VERTEX_FRAGMENT,
                     ty: wgpu::BindingType::Buffer { ty: wgpu::BufferBindingType::Uniform, has_dynamic_offset: false, min_binding_size: None },
                     count: None
                 }
@@ -44,7 +46,7 @@ impl CircleRenderable {
                 entry_point: Some("vs_main"),
                 buffers: &[
                     wgpu::VertexBufferLayout {
-                        array_stride: (std::mem::size_of::<f32>() as u64) * 2,
+                        array_stride: std::mem::size_of::<Vertex>() as u64,
                         step_mode: wgpu::VertexStepMode::Vertex,
                         attributes: &[
                             wgpu::VertexAttribute {
@@ -58,7 +60,7 @@ impl CircleRenderable {
                 compilation_options: Default::default()
             },
             primitive: wgpu::PrimitiveState {
-                topology: wgpu::PrimitiveTopology::LineStrip,
+                topology: wgpu::PrimitiveTopology::TriangleStrip,
                 .. Default::default()
             },
             depth_stencil: None,
@@ -85,15 +87,23 @@ impl CircleRenderable {
 
     /// Create a new circle to display on-screen.
     pub fn new(mapping: Mapping, renderer: &Renderer) -> Self {
-        let vertex_buffer = renderer.device.create_buffer(&wgpu::BufferDescriptor {
+        // TODO: share vertex buffer?
+        let mut buf = Vec::new();
+        for step in 0..=CIRCLE_SIZE {
+            let radians = (step as f32) / (CIRCLE_SIZE as f32) * (2.0 * std::f32::consts::PI);
+            let x = radians.sin();
+            let y = radians.cos();
+            buf.push(Vertex{pos: [x, y]}); // Inner circle vertex
+            buf.push(Vertex{pos: [x, y]}); // Outer circle vertex
+        }
+        let vertex_buffer = renderer.device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: None,
-            size: (std::mem::size_of::<Vertex>() * (CIRCLE_SIZE + 1)) as u64,
-            usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
-            mapped_at_creation: false
+            usage: wgpu::BufferUsages::VERTEX,
+            contents: &bytemuck::cast_slice(&buf)
         });
         let uniform_buffer = renderer.device.create_buffer(&wgpu::BufferDescriptor {
             label: None,
-            size: (std::mem::size_of::<f32>() as u64) * 4,
+            size: (std::mem::size_of::<f32>() as u64) * 8,
             usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
             mapped_at_creation: false
         });
@@ -122,26 +132,17 @@ impl CircleRenderable {
 impl Renderable for CircleRenderable {
     /// Update the circle with new parameters.
     fn update(&mut self, audio_packet: &AudioPacket, renderer: &Renderer, aspect_ratio: f32) {
-        let x = self.mapping[&RenderParam::X].eval(audio_packet);
-        let y = self.mapping[&RenderParam::Y].eval(audio_packet);
-        let radius = self.mapping[&RenderParam::Radius].eval(audio_packet);
-        // Update vertex buffer.
-        // TODO: do this in vertex shader...
-        let mut buf = Vec::new();
-        for step in 0..=CIRCLE_SIZE {
-            let radians = (step as f32) / (CIRCLE_SIZE as f32) * (2.0 * std::f32::consts::PI);
-            let x = x + radius * radians.sin();
-            let y = y + radius * radians.cos() * aspect_ratio;
-            buf.push(Vertex{pos: [x, y]});
-        }
-        renderer.queue.write_buffer(&self.vertex_buffer, 0, bytemuck::cast_slice(&buf));
-
-        // Update binding data
-        let r = self.mapping[&RenderParam::R].eval(audio_packet);
-        let g = self.mapping[&RenderParam::G].eval(audio_packet);
-        let b = self.mapping[&RenderParam::B].eval(audio_packet);
-        let color_buffer: [f32; 4] = [r, g, b, 1.0];
-        renderer.queue.write_buffer(&self.uniform_buffer, 0, bytemuck::cast_slice(&color_buffer));
+        let uniform_data = [
+            aspect_ratio,
+            self.mapping[&RenderParam::X].eval(audio_packet),
+            self.mapping[&RenderParam::Y].eval(audio_packet),
+            self.mapping[&RenderParam::Radius].eval(audio_packet),
+            self.mapping[&RenderParam::LineWidth].eval(audio_packet),
+            self.mapping[&RenderParam::R].eval(audio_packet),
+            self.mapping[&RenderParam::G].eval(audio_packet),
+            self.mapping[&RenderParam::B].eval(audio_packet)
+        ];
+        renderer.queue.write_buffer(&self.uniform_buffer, 0, bytemuck::cast_slice(&uniform_data));
     }
 
     /// Draw the circle using the provided render pass.
@@ -150,20 +151,10 @@ impl Renderable for CircleRenderable {
         render_pass.set_pipeline(&self.pipeline);
         render_pass.set_bind_group(0, &self.bind_group, &[]);
         render_pass.set_vertex_buffer(0, self.vertex_buffer.slice(..));
-        let max = (CIRCLE_SIZE + 1) as u32;
+        let max = VERTEX_COUNT as u32;
         render_pass.draw(0..max, 0..1);
     }
 }
-
-/*pub struct CircleParams {
-    pub aspect_ratio: f32,
-
-    pub x_pos: f32,
-    pub y_pos: f32,
-    pub radius: f32,
-    //pub line_thickness: f32,
-    pub color: [f32; 3]
-}*/
 
 #[derive(Zeroable, Pod, Clone, Copy)]
 #[repr(C)]
