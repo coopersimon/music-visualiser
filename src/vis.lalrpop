@@ -1,0 +1,73 @@
+use std::str::FromStr;
+use crate::renderer::*;
+use crate::operation::*;
+use crate::audio::AudioParam;
+
+grammar;
+
+pub Scene: Vec<(RenderableType, Mapping)> = {
+    <mut s:Scene> <r:Renderable> => { s.push(r); s },
+    Renderable => vec![<>]
+};
+
+Renderable: (RenderableType, Mapping) = {
+    <r:RenderableType> "{" <m:Mapping> "}" => (r, m)
+};
+
+Mapping: Mapping = {
+    <mut m:Mapping> "," <p:ParamBinding> => m.add(p),
+    ParamBinding => Mapping::new(<>)
+};
+
+ParamBinding: (RenderParam, Operation) = {
+    <p:RenderParam> "=" <o:Operation> => (p, o)
+};
+
+Operation: Operation = {
+    <o:AddSubExpr> => o
+};
+
+AddSubExpr: Operation = {
+    <l:AddSubExpr> "+" <r:MulDivExpr> => Operation::Add(Box::new(l), Box::new(r)),
+    <l:AddSubExpr> "-" <r:MulDivExpr> => Operation::Sub(Box::new(l), Box::new(r)),
+    MulDivExpr,
+};
+
+MulDivExpr: Operation = {
+    <l:MulDivExpr> "*" <r:Term> => Operation::Mul(Box::new(l), Box::new(r)),
+    <l:MulDivExpr> "/" <r:Term> => Operation::Div(Box::new(l), Box::new(r)),
+    Term,
+};
+
+Term: Operation = {
+    <n:Float>       => Operation::Const(n),
+    <p:AudioParam>  => Operation::Param(p),
+    "(" <e:Operation> ")" => e
+};
+
+RenderableType: RenderableType = {
+    "circle"    => RenderableType::Circle,
+    "quad"      => RenderableType::Quad
+};
+
+AudioParam: AudioParam = {
+    "level" => AudioParam::Amplitude,
+    "time"  => AudioParam::Time
+};
+
+RenderParam: RenderParam = {
+    "x"             => RenderParam::X,
+    "y"             => RenderParam::Y,
+    "r"             => RenderParam::R,
+    "g"             => RenderParam::G,
+    "b"             => RenderParam::B,
+    "radius"        => RenderParam::Radius,
+    "line_width"    => RenderParam::LineWidth,
+    "width"         => RenderParam::Width,
+    "height"        => RenderParam::Height
+};
+
+Float: f32 = {
+    r"\-?[0-9]+"         => f32::from_str(<>).unwrap(),
+    r"\-?[0-9]*\.[0-9]+" => f32::from_str(<>).unwrap(),
+};

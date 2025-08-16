@@ -24,7 +24,7 @@ struct Uniforms {
 @vertex fn vs_main(
     vertex: VertexInput
 ) -> VertexOutput {
-    let outer_circle = vertex.index % 2 == 1;
+    let outer_circle = (vertex.index & 1u) == 1u;
     let radius = params.radius + select(params.line_width, -params.line_width, outer_circle);
     var pos = vertex.pos * radius;
     pos.y *= params.aspect_ratio;

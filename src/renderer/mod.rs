@@ -8,6 +8,41 @@ use std::{
     collections::HashMap
 };
 use crate::audio::AudioPacket;
+use crate::operation::Operation;
+
+pub struct Mapping(HashMap<RenderParam, Operation>);
+
+impl Mapping {
+    pub fn new(from: (RenderParam, Operation)) -> Self {
+        Self(
+            HashMap::from([from])
+        )
+    }
+
+    pub fn add(mut self, param: (RenderParam, Operation)) -> Self {
+        self.0.insert(param.0, param.1);
+        Self(self.0)
+    }
+
+    pub fn get(&mut self, param: RenderParam) -> Result<Operation, CreationError> {
+        self.0.remove(&param).ok_or(CreationError::MissingParameter(param))
+    }
+
+    pub fn check_extra_parameters(&self) -> Result<(), CreationError> {
+        if let Some((param, _)) = self.0.iter().next() {
+            Err(CreationError::ExtraParameter(*param))
+        } else {
+            Ok(())
+        }
+    }
+}
+
+// TODO: format str.
+#[derive(Debug)]
+pub enum CreationError {
+    MissingParameter(RenderParam),
+    ExtraParameter(RenderParam)
+}
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
 pub enum RenderableType {
@@ -154,7 +189,7 @@ impl Surface {
     }
 }
 
-#[derive(Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub enum RenderParam {
     X,
     Y,

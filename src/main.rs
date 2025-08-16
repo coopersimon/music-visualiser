@@ -1,20 +1,21 @@
 mod app;
 mod renderer;
 mod audio;
+#[macro_use]
 mod operation;
+mod script;
 
 use winit::event_loop::EventLoop;
 
 use clap::Parser;
 
-use operation::Mapping;
-use audio::AudioParam;
-
 #[derive(Parser)]
 #[command(version, about)]
 struct Args {
     #[arg(short, long)]
-    audio: String
+    audio: String,
+    #[arg(short, long)]
+    script: String
 }
 
 fn main() {
@@ -27,29 +28,7 @@ fn main() {
 
     let renderer = renderer::Renderer::new();
 
-    // TODO: create based on script.
-    use renderer::RenderParam::*;
-    use operation::Operation::*;
-    let render_list: Vec<Box<dyn renderer::Renderable>> = vec![
-        Box::new(renderer::circle::CircleRenderable::new(Mapping::from([
-            (X, Const(0.0)),
-            (Y, Const(0.0)),
-            (Radius, Mul(Param(AudioParam::Amplitude).into(), Const(1.5).into())),
-            (LineWidth, Const(0.01)),
-            (R, Const(1.0)),
-            (G, Const(0.0)),
-            (B, Const(0.0))
-        ]), &renderer)),
-        Box::new(renderer::quad::QuadRenderable::new(Mapping::from([
-            (X, Const(-0.5)),
-            (Y, Const(-0.5)),
-            (Width, Const(0.2)),
-            (Height, Div(Param(AudioParam::Time).into(), Const(25.0).into())),
-            (R, Const(0.0)),
-            (G, Const(1.0)),
-            (B, Const(1.0))
-        ]), &renderer))
-    ];
+    let render_list = script::parse_file(&args.script, &renderer);
 
     let event_loop = EventLoop::new().expect("Failed to create event loop");
     let mut app = app::App::new(renderer, audio_source, render_list);

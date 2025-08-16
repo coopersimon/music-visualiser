@@ -1,8 +1,4 @@
-use std::collections::HashMap;
-use crate::renderer::RenderParam;
 use crate::audio::{AudioPacket, AudioParam};
-
-pub type Mapping = HashMap<RenderParam, Operation>;
 
 pub enum Operation {
     Const(f32),

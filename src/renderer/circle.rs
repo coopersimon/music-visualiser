@@ -1,10 +1,9 @@
 use bytemuck::{Zeroable, Pod};
 use wgpu::util::DeviceExt;
 
-use super::{Renderer, RenderPass, Renderable, RenderParam};
+use super::{Renderer, RenderPass, Renderable, RenderParam, Mapping, CreationError};
 use crate::{
-    operation::Mapping,
-    audio::AudioPacket
+    audio::AudioPacket, operation::Operation
 };
 
 const CIRCLE_SIZE: usize = 90;
@@ -18,11 +17,21 @@ struct Vertex {
 
 /// An instance of a circle.
 pub struct CircleRenderable {
-    mapping: Mapping,
+    params: CircleParameters,
     pipeline: wgpu::RenderPipeline,
     vertex_buffer: wgpu::Buffer,
     uniform_buffer: wgpu::Buffer,
     bind_group: wgpu::BindGroup
+}
+
+struct CircleParameters {
+    x: Operation,
+    y: Operation,
+    radius: Operation,
+    line_width: Operation,
+    r: Operation,
+    g: Operation,
+    b: Operation,
 }
 
 impl CircleRenderable {
@@ -92,7 +101,7 @@ impl CircleRenderable {
     }
 
     /// Create a new circle to display on-screen.
-    pub fn new(mapping: Mapping, renderer: &Renderer) -> Self {
+    pub fn new(mut mapping: Mapping, renderer: &Renderer) -> Result<Self, CreationError> {
         // TODO: share vertex buffer?
         let mut buf = Vec::new();
         for step in 0..=CIRCLE_SIZE {
@@ -125,13 +134,23 @@ impl CircleRenderable {
                 }
             ]
         });
-        Self {
-            mapping,
+        let params = CircleParameters {
+            x: mapping.get(RenderParam::X)?,
+            y: mapping.get(RenderParam::Y)?,
+            radius: mapping.get(RenderParam::Radius)?,
+            line_width: mapping.get(RenderParam::LineWidth)?,
+            r: mapping.get(RenderParam::R)?,
+            g: mapping.get(RenderParam::G)?,
+            b: mapping.get(RenderParam::B)?,
+        };
+        mapping.check_extra_parameters()?;
+        Ok(Self {
+            params,
             pipeline,
             vertex_buffer,
             uniform_buffer,
             bind_group
-        }
+        })
     }
 }
 
@@ -139,13 +158,13 @@ impl Renderable for CircleRenderable {
     fn update(&mut self, audio_packet: &AudioPacket, renderer: &Renderer, aspect_ratio: f32) {
         let uniform_data = [
             aspect_ratio,
-            self.mapping[&RenderParam::X].eval(audio_packet),
-            self.mapping[&RenderParam::Y].eval(audio_packet),
-            self.mapping[&RenderParam::Radius].eval(audio_packet),
-            self.mapping[&RenderParam::LineWidth].eval(audio_packet),
-            self.mapping[&RenderParam::R].eval(audio_packet),
-            self.mapping[&RenderParam::G].eval(audio_packet),
-            self.mapping[&RenderParam::B].eval(audio_packet)
+            self.params.x.eval(audio_packet),
+            self.params.y.eval(audio_packet),
+            self.params.radius.eval(audio_packet),
+            self.params.line_width.eval(audio_packet),
+            self.params.r.eval(audio_packet),
+            self.params.g.eval(audio_packet),
+            self.params.b.eval(audio_packet)
         ];
         renderer.queue.write_buffer(&self.uniform_buffer, 0, bytemuck::cast_slice(&uniform_data));
     }
