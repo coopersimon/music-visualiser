@@ -39,6 +39,15 @@ fn main() {
             (R, Const(1.0)),
             (G, Const(0.0)),
             (B, Const(0.0))
+        ]), &renderer)),
+        Box::new(renderer::quad::QuadRenderable::new(Mapping::from([
+            (X, Const(-0.5)),
+            (Y, Const(-0.5)),
+            (Width, Const(0.2)),
+            (Height, Div(Param(AudioParam::Time).into(), Const(25.0).into())),
+            (R, Const(0.0)),
+            (G, Const(1.0)),
+            (B, Const(1.0))
         ]), &renderer))
     ];
 

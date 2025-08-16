@@ -7,8 +7,7 @@ use crate::{
     audio::AudioPacket
 };
 
-const CIRCLE_SIZE: usize = 90;
-const VERTEX_COUNT: usize = (CIRCLE_SIZE + 1) * 2;
+const VERTEX_COUNT: usize = 4;
 
 #[derive(Zeroable, Pod, Clone, Copy)]
 #[repr(C)]
@@ -16,8 +15,8 @@ struct Vertex {
     pos: [f32; 2]
 }
 
-/// An instance of a circle.
-pub struct CircleRenderable {
+/// An instance of a quad.
+pub struct QuadRenderable {
     mapping: Mapping,
     pipeline: wgpu::RenderPipeline,
     vertex_buffer: wgpu::Buffer,
@@ -25,7 +24,7 @@ pub struct CircleRenderable {
     bind_group: wgpu::BindGroup
 }
 
-impl CircleRenderable {
+impl QuadRenderable {
     pub fn create_pipeline(device: &wgpu::Device) -> wgpu::RenderPipeline {
         let bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
             label: None,
@@ -43,9 +42,9 @@ impl CircleRenderable {
             bind_group_layouts: &[&bind_group_layout],
             push_constant_ranges: &[]
         });
-        let shader_module = device.create_shader_module(wgpu::include_wgsl!("shaders/circle.wgsl"));
+        let shader_module = device.create_shader_module(wgpu::include_wgsl!("shaders/quad.wgsl"));
         let circle_desc = wgpu::RenderPipelineDescriptor {
-            label: Some("circle"),
+            label: Some("quad"),
             layout: Some(&pipeline_layout),
             vertex: wgpu::VertexState {
                 module: &shader_module,
@@ -91,17 +90,15 @@ impl CircleRenderable {
         device.create_render_pipeline(&circle_desc)
     }
 
-    /// Create a new circle to display on-screen.
+    /// Create a new quad to display on-screen.
     pub fn new(mapping: Mapping, renderer: &Renderer) -> Self {
         // TODO: share vertex buffer?
-        let mut buf = Vec::new();
-        for step in 0..=CIRCLE_SIZE {
-            let radians = (step as f32) / (CIRCLE_SIZE as f32) * (2.0 * std::f32::consts::PI);
-            let x = radians.sin();
-            let y = radians.cos();
-            buf.push(Vertex{pos: [x, y]}); // Inner circle vertex
-            buf.push(Vertex{pos: [x, y]}); // Outer circle vertex
-        }
+        let buf = [
+            Vertex{pos: [0.0, 0.0]},
+            Vertex{pos: [1.0, 0.0]},
+            Vertex{pos: [0.0, 1.0]},
+            Vertex{pos: [1.0, 1.0]}
+        ];
         let vertex_buffer = renderer.device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: None,
             usage: wgpu::BufferUsages::VERTEX,
@@ -113,7 +110,7 @@ impl CircleRenderable {
             usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
             mapped_at_creation: false
         });
-        let pipeline = renderer.get_render_pipeline(super::RenderableType::Circle);
+        let pipeline = renderer.get_render_pipeline(super::RenderableType::Quad);
         let bind_group_layout = pipeline.get_bind_group_layout(0);
         let bind_group = renderer.device.create_bind_group(&wgpu::BindGroupDescriptor {
             label: None,
@@ -135,14 +132,13 @@ impl CircleRenderable {
     }
 }
 
-impl Renderable for CircleRenderable {
-    fn update(&mut self, audio_packet: &AudioPacket, renderer: &Renderer, aspect_ratio: f32) {
+impl Renderable for QuadRenderable {
+    fn update(&mut self, audio_packet: &AudioPacket, renderer: &Renderer, _aspect_ratio: f32) {
         let uniform_data = [
-            aspect_ratio,
             self.mapping[&RenderParam::X].eval(audio_packet),
             self.mapping[&RenderParam::Y].eval(audio_packet),
-            self.mapping[&RenderParam::Radius].eval(audio_packet),
-            self.mapping[&RenderParam::LineWidth].eval(audio_packet),
+            self.mapping[&RenderParam::Width].eval(audio_packet),
+            self.mapping[&RenderParam::Height].eval(audio_packet),
             self.mapping[&RenderParam::R].eval(audio_packet),
             self.mapping[&RenderParam::G].eval(audio_packet),
             self.mapping[&RenderParam::B].eval(audio_packet)

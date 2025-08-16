@@ -1,4 +1,5 @@
 pub mod circle;
+pub mod quad;
 
 use winit::window::Window;
 use std::{
@@ -10,7 +11,8 @@ use crate::audio::AudioPacket;
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
 pub enum RenderableType {
-    Circle
+    Circle,
+    Quad
 }
 
 /// Provides the output display to the window.
@@ -86,7 +88,8 @@ impl Renderer {
 
         if !pipelines.contains_key(&renderable) {
             let pipeline = match renderable {
-                RenderableType::Circle => circle::CircleRenderable::create_pipeline(&self.device)
+                RenderableType::Circle =>   circle::CircleRenderable::create_pipeline(&self.device),
+                RenderableType::Quad =>     quad::QuadRenderable::create_pipeline(&self.device),
             };
             pipelines.insert(renderable, pipeline);
         }
@@ -159,12 +162,16 @@ pub enum RenderParam {
     G,
     B,
     Radius,
-    LineWidth
+    LineWidth,
+    Width,
+    Height
 }
 
 pub trait Renderable {
     // TODO: store graphics params somewhere?
+    /// Update the renderable with new parameters.
     fn update(&mut self, audio_packet: &AudioPacket, renderer: &Renderer, aspect_ratio: f32);
 
+    /// Draw the renderable using the provided render pass.
     fn draw(&self, render_pass: &mut RenderPass<'_>);
 }

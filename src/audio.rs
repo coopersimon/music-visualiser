@@ -44,28 +44,40 @@ impl AudioSource {
             .unwrap() / (buffer_size as f32);
 
         AudioPacket {
-            amplitude
+            amplitude,
+            time: seconds
         }
     }
 }
 
 /// Audio data for a single frame.
 pub struct AudioPacket {
-    amplitude: f32
+    amplitude: f32,
+    time: f32
 }
 
 impl AudioPacket {
     pub fn get_param(&self, param: AudioParam) -> f32 {
         use AudioParam::*;
         match param {
-            Amplitude => self.amplitude
+            Amplitude => self.amplitude,
+            Time => self.time
         }
     }
 }
 
+/*#[derive(Clone, Copy)]
+pub enum Channel {
+    Left,
+    Right,
+    Both
+    // Future: more than 2 channel audio?
+}*/
+
 #[derive(Clone, Copy)]
 pub enum AudioParam {
-    Amplitude
+    Amplitude,
+    Time,
 }
 
 /// Handles playback of the audio source to speakers.
