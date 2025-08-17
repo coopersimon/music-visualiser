@@ -3,12 +3,12 @@ use crate::renderer::*;
 use crate::operation::*;
 use crate::audio::AudioParam;
 use lalrpop_util::ParseError;
-use crate::script::UserError;
+use crate::script::ScriptParseError;
 
 grammar;
 
 extern {
-    type Error = UserError;
+    type Error = ScriptParseError;
 }
 
 pub Scene: Vec<(RenderableType, Mapping)> = {
@@ -54,21 +54,21 @@ Term: Operation = {
 RenderableType: RenderableType = {
     r"[a-z_]+" =>? RenderableType::from_str(<>)
         .map_err(|_| ParseError::User {
-            error: UserError::UnrecognizedRenderable(<>.to_string())
+            error: ScriptParseError::UnrecognizedRenderable(<>.to_string())
         })
 };
 
 AudioParam: AudioParam = {
     r"[a-z_]+" =>? AudioParam::from_str(<>)
         .map_err(|_| ParseError::User {
-            error: UserError::UnrecognizedAudioParam(<>.to_string())
+            error: ScriptParseError::UnrecognizedAudioParam(<>.to_string())
         })
 };
 
 RenderParam: RenderParam = {
     r"[a-z_]+" =>? RenderParam::from_str(<>)
         .map_err(|_| ParseError::User {
-            error: UserError::UnrecognizedRenderParam(<>.to_string())
+            error: ScriptParseError::UnrecognizedRenderParam(<>.to_string())
         })
 };
 

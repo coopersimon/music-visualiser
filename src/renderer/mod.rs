@@ -37,7 +37,6 @@ impl Mapping {
     }
 }
 
-// TODO: format str.
 #[derive(Debug)]
 pub enum CreationError {
     MissingParameter(RenderParam),
@@ -60,6 +59,10 @@ pub enum RenderableType {
     Circle,
     #[strum(ascii_case_insensitive)]
     Quad
+}
+
+pub struct Scene {
+    pub render_list: Vec<Box<dyn Renderable>>
 }
 
 /// Provides the output display to the window.

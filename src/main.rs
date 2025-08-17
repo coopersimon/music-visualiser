@@ -28,10 +28,13 @@ fn main() {
 
     let renderer = renderer::Renderer::new();
 
-    let render_list = script::parse_file(&args.script, &renderer);
+    let scene = match script::parse_file(&args.script, &renderer) {
+        Ok(s) => s,
+        Err(e) => panic!("script error: {:?}", e)
+    };
 
     let event_loop = EventLoop::new().expect("Failed to create event loop");
-    let mut app = app::App::new(renderer, audio_source, render_list);
+    let mut app = app::App::new(renderer, audio_source, scene);
     event_loop.set_control_flow(winit::event_loop::ControlFlow::Poll);
     event_loop.run_app(&mut app).unwrap();
 }

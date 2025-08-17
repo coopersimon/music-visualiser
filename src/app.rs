@@ -8,7 +8,7 @@ use winit::{
 
 use crate::{
     audio::AudioSource,
-    renderer::{Renderable, Renderer, Surface}
+    renderer::{Renderer, Scene, Surface}
 };
 
 /// State of the active window.
@@ -21,18 +21,18 @@ struct WindowState {
 pub struct App {
     renderer: Renderer,
     audio_source: AudioSource,
-    render_list: Vec<Box<dyn Renderable>>,
+    scene: Scene,
     window: Option<WindowState>,
 
     start_time: chrono::DateTime<chrono::Utc>,
 }
 
 impl App {
-    pub fn new(renderer: Renderer, audio_source: AudioSource, render_list: Vec<Box<dyn Renderable>>) -> Self {
+    pub fn new(renderer: Renderer, audio_source: AudioSource, scene: Scene) -> Self {
         Self {
             renderer,
             audio_source,
-            render_list,
+            scene,
             window: None,
 
             start_time: chrono::Utc::now()
@@ -81,7 +81,7 @@ impl ApplicationHandler for App {
                 let mut render_pass = self.renderer.new_render_pass(&mut self.window.as_mut().unwrap().surface);
                 render_pass.begin(wgpu::Color::WHITE);
 
-                for renderable in &mut self.render_list {
+                for renderable in &mut self.scene.render_list {
                     renderable.update(&audio_packet, &self.renderer, aspect_ratio);
                     renderable.draw(&mut render_pass);
                 }

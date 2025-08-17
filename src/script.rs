@@ -2,48 +2,69 @@ use lalrpop_util::lalrpop_mod;
 use std::{fs::File, io::Read};
 
 use crate::renderer::{
-    self, Renderable, RenderableType, Renderer, CreationError, Mapping
+    self, Renderable, RenderableType, Renderer, CreationError, Mapping, Scene
 };
 
+lalrpop_mod!(vis);
+
 #[derive(Debug)]
-pub enum UserError {
+pub enum ScriptParseError {
     UnrecognizedRenderable(String),
     UnrecognizedAudioParam(String),
-    UnrecognizedRenderParam(String)
+    UnrecognizedRenderParam(String),
+    // TODO: give this error a bit more info
+    Line(String)
 }
 
-#[derive(Debug)]
-pub enum ParseError {
-
+impl ScriptParseError {
+    fn from_parse_error(err: lalrpop_util::ParseError<usize, vis::Token<'_>, ScriptParseError>, file_data: &str) -> Self {
+        use ScriptParseError::*;
+        match err {
+            lalrpop_util::ParseError::User { error } => error,
+            lalrpop_util::ParseError::InvalidToken { location } => Line(get_line_for_location(file_data, location).to_string()),
+            lalrpop_util::ParseError::ExtraToken { token } => Line(get_line_for_location(file_data, token.0).to_string()),
+            lalrpop_util::ParseError::UnrecognizedEof { location, .. } => Line(get_line_for_location(file_data, location).to_string()),
+            lalrpop_util::ParseError::UnrecognizedToken { token, .. } => Line(get_line_for_location(file_data, token.0).to_string()),
+        }
+    }
 }
 
 #[derive(Debug)]
 pub enum ScriptError {
     FileError(std::io::Error),
-    ParseError(ParseError),
+    ParseError(ScriptParseError),
     CreationError(CreationError)
 }
 
-lalrpop_mod!(vis);
+impl From<std::io::Error> for ScriptError {
+    fn from(value: std::io::Error) -> Self {
+        ScriptError::FileError(value)
+    }
+}
 
-// TODO: improve error handling here.
-pub fn parse_file(file_path: &str, renderer: &Renderer) -> Vec<Box<dyn Renderable>> {
-    let mut file = File::open(file_path).expect("could not open script file");
+impl From<ScriptParseError> for ScriptError {
+    fn from(value: ScriptParseError) -> Self {
+        ScriptError::ParseError(value)
+    }
+}
+
+impl From<CreationError> for ScriptError {
+    fn from(value: CreationError) -> Self {
+        ScriptError::CreationError(value)
+    }
+}
+
+pub fn parse_file(file_path: &str, renderer: &Renderer) -> Result<Scene, ScriptError> {
+    let mut file = File::open(file_path)?;
     let mut file_data = String::new();
-    file.read_to_string(&mut file_data).expect("could not read script file");
-    let scene = match vis::SceneParser::new().parse(&file_data) {
-        Ok(s) => s,
-        Err(e) => match e {
-            lalrpop_util::ParseError::InvalidToken { location } => {
-                let s = get_line_for_location(&file_data, location);
-                panic!("got error: {}", s)
-            },
-            _ => panic!("error: {:?}", e)
-        }
-    };
-    scene.into_iter().map(|(renderable_type, params)| {
-        create_renderable(renderable_type, params, renderer).expect("could not create renderable")
-    }).collect()
+    file.read_to_string(&mut file_data)?;
+    let scene = vis::SceneParser::new().parse(&file_data)
+        .map_err(|e| ScriptParseError::from_parse_error(e, &file_data))?;
+    Ok(Scene {
+        render_list: scene.into_iter().map(|(renderable_type, params)| {
+            create_renderable(renderable_type, params, renderer)
+        }).collect::<Result<Vec<_>, _>>()?
+    })
 }
 
 fn create_renderable(renderable_type: RenderableType, params: Mapping, renderer: &Renderer) -> Result<Box<dyn Renderable>, CreationError> {
