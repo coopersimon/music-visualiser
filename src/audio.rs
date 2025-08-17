@@ -74,9 +74,11 @@ pub enum Channel {
     // Future: more than 2 channel audio?
 }*/
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, strum::EnumString, strum::Display)]
 pub enum AudioParam {
+    #[strum(serialize = "level")]
     Amplitude,
+    #[strum(ascii_case_insensitive)]
     Time,
 }
 

@@ -53,10 +53,29 @@ For further examples, see the `examples` folder.
 
 ## Reference
 
+Note that the screen space is defined as follows:
+
+```
+  ----- 1.0 -----
+  |             |
+-1.0     0     1.0
+  |             |
+  ---- -1.0 -----
+```
+
+With X varying from left-to-right as -1.0 to 1.0, and Y varying from bottom-to-top as -1.0 to 1.0.
+
 ### Objects
 
 - `circle`
+  - `x`, `y`: position of centre
+  - `radius`: size of radius
+  - `line_width`: width of line
+  - `r`, `g`, `b`: colour
 - `quad`
+  - `x`, `y`: position of bottom-left
+  - `width`, `height`: size of quad
+  - `r`, `g`, `b`: colour
 
 ### Audio parameters
 

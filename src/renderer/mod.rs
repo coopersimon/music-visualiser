@@ -44,9 +44,21 @@ pub enum CreationError {
     ExtraParameter(RenderParam)
 }
 
-#[derive(Clone, Copy, PartialEq, Eq, Hash)]
+impl std::fmt::Display for CreationError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        use CreationError::*;
+        match *self {
+            MissingParameter(p) =>  write!(f, "missing required parameter {}", p),
+            ExtraParameter(p) =>    write!(f, "invalid parameter {}", p),
+        }
+    }
+}
+
+#[derive(Clone, Copy, PartialEq, Eq, Hash, strum::EnumString, strum::Display)]
 pub enum RenderableType {
+    #[strum(ascii_case_insensitive)]
     Circle,
+    #[strum(ascii_case_insensitive)]
     Quad
 }
 
@@ -189,16 +201,25 @@ impl Surface {
     }
 }
 
-#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug, strum::EnumString, strum::Display)]
 pub enum RenderParam {
+    #[strum(ascii_case_insensitive)]
     X,
+    #[strum(ascii_case_insensitive)]
     Y,
+    #[strum(ascii_case_insensitive)]
     R,
+    #[strum(ascii_case_insensitive)]
     G,
+    #[strum(ascii_case_insensitive)]
     B,
+    #[strum(ascii_case_insensitive)]
     Radius,
+    #[strum(serialize = "line_width")]
     LineWidth,
+    #[strum(ascii_case_insensitive)]
     Width,
+    #[strum(ascii_case_insensitive)]
     Height
 }
 

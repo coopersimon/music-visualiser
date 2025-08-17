@@ -2,8 +2,14 @@ use std::str::FromStr;
 use crate::renderer::*;
 use crate::operation::*;
 use crate::audio::AudioParam;
+use lalrpop_util::ParseError;
+use crate::script::UserError;
 
 grammar;
+
+extern {
+    type Error = UserError;
+}
 
 pub Scene: Vec<(RenderableType, Mapping)> = {
     <mut s:Scene> <r:Renderable> => { s.push(r); s },
@@ -15,7 +21,7 @@ Renderable: (RenderableType, Mapping) = {
 };
 
 Mapping: Mapping = {
-    <mut m:Mapping> "," <p:ParamBinding> => m.add(p),
+    <m:Mapping> "," <p:ParamBinding> => m.add(p),
     ParamBinding => Mapping::new(<>)
 };
 
@@ -46,25 +52,24 @@ Term: Operation = {
 };
 
 RenderableType: RenderableType = {
-    "circle"    => RenderableType::Circle,
-    "quad"      => RenderableType::Quad
+    r"[a-z_]+" =>? RenderableType::from_str(<>)
+        .map_err(|_| ParseError::User {
+            error: UserError::UnrecognizedRenderable(<>.to_string())
+        })
 };
 
 AudioParam: AudioParam = {
-    "level" => AudioParam::Amplitude,
-    "time"  => AudioParam::Time
+    r"[a-z_]+" =>? AudioParam::from_str(<>)
+        .map_err(|_| ParseError::User {
+            error: UserError::UnrecognizedAudioParam(<>.to_string())
+        })
 };
 
 RenderParam: RenderParam = {
-    "x"             => RenderParam::X,
-    "y"             => RenderParam::Y,
-    "r"             => RenderParam::R,
-    "g"             => RenderParam::G,
-    "b"             => RenderParam::B,
-    "radius"        => RenderParam::Radius,
-    "line_width"    => RenderParam::LineWidth,
-    "width"         => RenderParam::Width,
-    "height"        => RenderParam::Height
+    r"[a-z_]+" =>? RenderParam::from_str(<>)
+        .map_err(|_| ParseError::User {
+            error: UserError::UnrecognizedRenderParam(<>.to_string())
+        })
 };
 
 Float: f32 = {
