@@ -2,23 +2,25 @@ use lalrpop_util::lalrpop_mod;
 use std::{fs::File, io::Read};
 
 use crate::renderer::{
-    self, Renderable, RenderableType, Renderer, CreationError, Mapping, Scene
+    self, object::{ObjectRenderable, ObjectType}, Renderer, CreationError, Mapping, Display
 };
 
 lalrpop_mod!(vis);
 
 #[derive(Debug)]
-pub enum ScriptParseError {
-    UnrecognizedRenderable(String),
+pub enum ScriptError {
+    FileError(std::io::Error),
+    UnrecognizedObject(String),
     UnrecognizedAudioParam(String),
     UnrecognizedRenderParam(String),
+    CreationError(CreationError),
     // TODO: give this error a bit more info
     Line(String)
 }
 
-impl ScriptParseError {
-    fn from_parse_error(err: lalrpop_util::ParseError<usize, vis::Token<'_>, ScriptParseError>, file_data: &str) -> Self {
-        use ScriptParseError::*;
+impl ScriptError {
+    fn from_parse_error(err: lalrpop_util::ParseError<usize, vis::Token<'_>, ScriptError>, file_data: &str) -> Self {
+        use ScriptError::*;
         match err {
             lalrpop_util::ParseError::User { error } => error,
             lalrpop_util::ParseError::InvalidToken { location } => Line(get_line_for_location(file_data, location).to_string()),
@@ -29,22 +31,9 @@ impl ScriptParseError {
     }
 }
 
-#[derive(Debug)]
-pub enum ScriptError {
-    FileError(std::io::Error),
-    ParseError(ScriptParseError),
-    CreationError(CreationError)
-}
-
 impl From<std::io::Error> for ScriptError {
     fn from(value: std::io::Error) -> Self {
         ScriptError::FileError(value)
-    }
-}
-
-impl From<ScriptParseError> for ScriptError {
-    fn from(value: ScriptParseError) -> Self {
-        ScriptError::ParseError(value)
     }
 }
 
@@ -54,23 +43,18 @@ impl From<CreationError> for ScriptError {
     }
 }
 
-pub fn parse_file(file_path: &str, renderer: &Renderer) -> Result<Scene, ScriptError> {
+pub fn parse_file(file_path: &str, renderer: &Renderer) -> Result<Display, ScriptError> {
     let mut file = File::open(file_path)?;
     let mut file_data = String::new();
     file.read_to_string(&mut file_data)?;
-    let scene = vis::SceneParser::new().parse(&file_data)
-        .map_err(|e| ScriptParseError::from_parse_error(e, &file_data))?;
-    Ok(Scene {
-        render_list: scene.into_iter().map(|(renderable_type, params)| {
-            create_renderable(renderable_type, params, renderer)
-        }).collect::<Result<Vec<_>, _>>()?
-    })
+    vis::DisplayParser::new().parse(renderer, &file_data)
+        .map_err(|e| ScriptError::from_parse_error(e, &file_data))
 }
 
-fn create_renderable(renderable_type: RenderableType, params: Mapping, renderer: &Renderer) -> Result<Box<dyn Renderable>, CreationError> {
-    Ok(match renderable_type {
-        RenderableType::Circle =>   Box::new(renderer::circle::CircleRenderable::new(params, renderer)?),
-        RenderableType::Quad =>     Box::new(renderer::quad::QuadRenderable::new(params, renderer)?),
+pub fn create_object(object_type: ObjectType, params: Mapping, renderer: &Renderer) -> Result<Box<dyn ObjectRenderable>, CreationError> {
+    Ok(match object_type {
+        ObjectType::Circle => Box::new(renderer::object::circle::CircleRenderable::new(params, renderer)?),
+        ObjectType::Quad =>   Box::new(renderer::object::quad::QuadRenderable::new(params, renderer)?),
     })
 }
 

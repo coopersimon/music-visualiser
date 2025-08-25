@@ -1,23 +1,54 @@
 use std::str::FromStr;
 use crate::renderer::*;
+use crate::renderer::object::*;
+use crate::renderer::scene::*;
 use crate::operation::*;
 use crate::audio::AudioParam;
 use lalrpop_util::ParseError;
-use crate::script::ScriptParseError;
-
-grammar;
-
-extern {
-    type Error = ScriptParseError;
-}
-
-pub Scene: Vec<(RenderableType, Mapping)> = {
-    <mut s:Scene> <r:Renderable> => { s.push(r); s },
-    Renderable => vec![<>]
+use crate::script::{
+    ScriptError,
+    create_object
 };
 
-Renderable: (RenderableType, Mapping) = {
-    <r:RenderableType> "{" <m:Mapping> "}" => (r, m)
+grammar(renderer: &Renderer);
+
+extern {
+    type Error = ScriptError;
+}
+
+pub Display: Display = {
+    "display" "=" <s:Scene> => Display::new(s)
+};
+
+Scene: Box<dyn Scene> = {
+    RenderListScene => <>
+};
+
+RenderListScene: Box<dyn Scene> = {
+    "scene" "{" <b:BG> <o:Objects> "}" =>? RenderList::new(o, b, renderer)
+        .map_err(|e| ParseError::User {
+            error: e.into()
+        })
+};
+
+BG: Mapping = {
+    "bg" "=" "{" <m:Mapping> "}" => m
+};
+
+Objects: Vec<Box<dyn ObjectRenderable>> = {
+    "objects" "=" "[" <o:ObjectList> "]" => o
+};
+
+ObjectList: Vec<Box<dyn ObjectRenderable>> = {
+    <mut l:ObjectList> "," <o:Object> => { l.push(o); l },
+    Object => vec![<>]
+};
+
+Object: Box<dyn ObjectRenderable> = {
+    <r:ObjectType> "{" <m:Mapping> "}" =>? create_object(r, m, renderer)
+        .map_err(|e| ParseError::User {
+            error: e.into()
+        })
 };
 
 Mapping: Mapping = {
@@ -51,24 +82,24 @@ Term: Operation = {
     "(" <e:Operation> ")" => e
 };
 
-RenderableType: RenderableType = {
-    r"[a-z_]+" =>? RenderableType::from_str(<>)
+ObjectType: ObjectType = {
+    r"[a-z_]+" =>? ObjectType::from_str(<>)
         .map_err(|_| ParseError::User {
-            error: ScriptParseError::UnrecognizedRenderable(<>.to_string())
+            error: ScriptError::UnrecognizedObject(<>.to_string())
         })
 };
 
 AudioParam: AudioParam = {
     r"[a-z_]+" =>? AudioParam::from_str(<>)
         .map_err(|_| ParseError::User {
-            error: ScriptParseError::UnrecognizedAudioParam(<>.to_string())
+            error: ScriptError::UnrecognizedAudioParam(<>.to_string())
         })
 };
 
 RenderParam: RenderParam = {
     r"[a-z_]+" =>? RenderParam::from_str(<>)
         .map_err(|_| ParseError::User {
-            error: ScriptParseError::UnrecognizedRenderParam(<>.to_string())
+            error: ScriptError::UnrecognizedRenderParam(<>.to_string())
         })
 };
 

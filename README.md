@@ -12,19 +12,27 @@ It can be run as follows:
 
 ## Making a script
 
-To create a scene, write a script file as follows:
+To create a display, write a script file as follows:
 
 ```
-object_1 {
-    visual_parameter_1 = expression,
-    visual_parameter_2 = expression,
+display = scene {
+  bg = {
     ...
+  }
+  objects = [
+    object_1 {
+      visual_parameter_1 = expression,
+      visual_parameter_2 = expression,
+      ...
+    },
+    object_2 {
+      visual_parameter_1 = expression,
+      visual_parameter_2 = expression,
+      ...
+    }
+  ]
 }
-object_2 {
-    visual_parameter_1 = expression,
-    visual_parameter_2 = expression,
-    ...
-}
+
 ```
 
 There are a variety of objects to choose from. Each has its own list of visual parameters.

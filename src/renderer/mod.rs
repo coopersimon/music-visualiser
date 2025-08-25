@@ -1,5 +1,5 @@
-pub mod circle;
-pub mod quad;
+pub mod object;
+pub mod scene;
 
 use winit::window::Window;
 use std::{
@@ -7,8 +7,42 @@ use std::{
     cell::RefCell,
     collections::HashMap
 };
-use crate::audio::AudioPacket;
-use crate::operation::Operation;
+use crate::{
+    audio::AudioPacket,
+    operation::Operation
+};
+use scene::Scene;
+use object::*;
+
+#[derive(Clone, Copy)]
+pub struct Size {
+    pub width: u32,
+    pub height: u32
+}
+
+/// The overall image to render.
+pub struct Display {
+    scene: Box<dyn Scene>
+}
+
+impl Display {
+    pub fn new(scene: Box<dyn Scene>) -> Self {
+        Self {
+            scene
+        }
+    }
+
+    pub fn render(&mut self, renderer: &Renderer, audio_packet: &AudioPacket, surface: &mut Surface) {
+        let size = Size { width: surface.surface_config.width, height: surface.surface_config.height };
+        let surface_tex = surface.surface.get_current_texture().expect("could not get texture");
+
+        self.scene.set_display(&surface_tex);
+        self.scene.update(renderer, audio_packet, size);
+        self.scene.draw(renderer);
+
+        surface_tex.present();
+    }
+}
 
 pub struct Mapping(HashMap<RenderParam, Operation>);
 
@@ -53,18 +87,6 @@ impl std::fmt::Display for CreationError {
     }
 }
 
-#[derive(Clone, Copy, PartialEq, Eq, Hash, strum::EnumString, strum::Display)]
-pub enum RenderableType {
-    #[strum(ascii_case_insensitive)]
-    Circle,
-    #[strum(ascii_case_insensitive)]
-    Quad
-}
-
-pub struct Scene {
-    pub render_list: Vec<Box<dyn Renderable>>
-}
-
 /// Provides the output display to the window.
 pub struct Renderer {
     instance: wgpu::Instance,
@@ -72,7 +94,7 @@ pub struct Renderer {
     device: wgpu::Device,
     queue: wgpu::Queue,
 
-    pipelines: Rc<RefCell< HashMap<RenderableType, wgpu::RenderPipeline> >>
+    pipelines: Rc<RefCell< HashMap<ObjectType, wgpu::RenderPipeline> >>
 }
 
 impl Renderer {
@@ -119,27 +141,23 @@ impl Renderer {
 
 // Render commands
 impl Renderer {
-    pub fn new_render_pass<'a>(&'a self, surface: &mut Surface) -> RenderPass<'a> {
-        let surface_tex = surface.surface.get_current_texture()
-            .expect("Timeout when acquiring next swapchain tex.");
-        let surface_tex_view = surface_tex.texture.create_view(&Default::default());
+    pub fn new_render_pass<'a>(&'a self, tex_view: wgpu::TextureView) -> RenderPass<'a> {
         let command_encoder = self.device.create_command_encoder(&wgpu::CommandEncoderDescriptor::default());
         RenderPass {
             renderer: &self,
             command_encoder,
-            surface_tex,
-            surface_tex_view,
+            tex_view,
             render_pass: None
         }
     }
 
-    pub fn get_render_pipeline(&self, renderable: RenderableType) -> wgpu::RenderPipeline {
+    pub fn get_render_pipeline(&self, renderable: ObjectType) -> wgpu::RenderPipeline {
         let mut pipelines = self.pipelines.borrow_mut();
 
         if !pipelines.contains_key(&renderable) {
             let pipeline = match renderable {
-                RenderableType::Circle =>   circle::CircleRenderable::create_pipeline(&self.device),
-                RenderableType::Quad =>     quad::QuadRenderable::create_pipeline(&self.device),
+                ObjectType::Circle =>   circle::CircleRenderable::create_pipeline(&self.device),
+                ObjectType::Quad =>     quad::QuadRenderable::create_pipeline(&self.device),
             };
             pipelines.insert(renderable, pipeline);
         }
@@ -152,9 +170,8 @@ impl Renderer {
 
 pub struct RenderPass<'a> {
     renderer: &'a Renderer,
-    command_encoder: wgpu::CommandEncoder,
-    surface_tex: wgpu::SurfaceTexture,
-    surface_tex_view: wgpu::TextureView,
+    command_encoder: wgpu::CommandEncoder, // TODO: this shouldn't make a new encoder every time.
+    tex_view: wgpu::TextureView,
     render_pass: Option<wgpu::RenderPass<'static>>
 }
 
@@ -164,7 +181,7 @@ impl<'a> RenderPass<'a> {
         let render_pass = self.command_encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
             label: None,
             color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                view: &self.surface_tex_view,
+                view: &self.tex_view,
                 ops: wgpu::Operations {
                     load: wgpu::LoadOp::Clear(clear_color),
                     store: wgpu::StoreOp::Store,
@@ -179,13 +196,12 @@ impl<'a> RenderPass<'a> {
     }
 
     // TODO: move this to drop?
-    /// End the render pass, submit to queue, and present.
+    /// End the render pass and submit to queue.
     pub fn finish(mut self) {
         // End render pass.
         self.render_pass = None;
         let command_buffer = self.command_encoder.finish();
         self.renderer.queue.submit([command_buffer]);
-        self.surface_tex.present();
     }
 }
 
@@ -224,13 +240,4 @@ pub enum RenderParam {
     Width,
     #[strum(ascii_case_insensitive)]
     Height
-}
-
-pub trait Renderable {
-    // TODO: store graphics params somewhere?
-    /// Update the renderable with new parameters.
-    fn update(&mut self, audio_packet: &AudioPacket, renderer: &Renderer, aspect_ratio: f32);
-
-    /// Draw the renderable using the provided render pass.
-    fn draw(&self, render_pass: &mut RenderPass<'_>);
 }

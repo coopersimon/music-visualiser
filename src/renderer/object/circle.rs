@@ -1,12 +1,15 @@
 use bytemuck::{Zeroable, Pod};
 use wgpu::util::DeviceExt;
 
-use super::{Renderer, RenderPass, Renderable, RenderParam, Mapping, CreationError};
 use crate::{
-    audio::AudioPacket, operation::Operation
+    audio::AudioPacket, operation::Operation, renderer::{
+        Renderer, RenderPass, RenderParam, Mapping, CreationError
+    }
 };
+use super::{ObjectRenderable, ObjectType};
 
-const VERTEX_COUNT: usize = 4;
+const CIRCLE_SIZE: usize = 90;
+const VERTEX_COUNT: usize = (CIRCLE_SIZE + 1) * 2;
 
 #[derive(Zeroable, Pod, Clone, Copy)]
 #[repr(C)]
@@ -14,26 +17,26 @@ struct Vertex {
     pos: [f32; 2]
 }
 
-/// An instance of a quad.
-pub struct QuadRenderable {
-    params: QuadParameters,
+/// An instance of a circle.
+pub struct CircleRenderable {
+    params: CircleParameters,
     pipeline: wgpu::RenderPipeline,
     vertex_buffer: wgpu::Buffer,
     uniform_buffer: wgpu::Buffer,
     bind_group: wgpu::BindGroup
 }
 
-struct QuadParameters {
+struct CircleParameters {
     x: Operation,
     y: Operation,
-    width: Operation,
-    height: Operation,
+    radius: Operation,
+    line_width: Operation,
     r: Operation,
     g: Operation,
     b: Operation,
 }
 
-impl QuadRenderable {
+impl CircleRenderable {
     pub fn create_pipeline(device: &wgpu::Device) -> wgpu::RenderPipeline {
         let bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
             label: None,
@@ -51,9 +54,9 @@ impl QuadRenderable {
             bind_group_layouts: &[&bind_group_layout],
             push_constant_ranges: &[]
         });
-        let shader_module = device.create_shader_module(wgpu::include_wgsl!("shaders/quad.wgsl"));
+        let shader_module = device.create_shader_module(wgpu::include_wgsl!("shaders/circle.wgsl"));
         let circle_desc = wgpu::RenderPipelineDescriptor {
-            label: Some("quad"),
+            label: Some("circle"),
             layout: Some(&pipeline_layout),
             vertex: wgpu::VertexState {
                 module: &shader_module,
@@ -99,15 +102,17 @@ impl QuadRenderable {
         device.create_render_pipeline(&circle_desc)
     }
 
-    /// Create a new quad to display on-screen.
+    /// Create a new circle to display on-screen.
     pub fn new(mut mapping: Mapping, renderer: &Renderer) -> Result<Self, CreationError> {
         // TODO: share vertex buffer?
-        let buf = [
-            Vertex{pos: [0.0, 0.0]},
-            Vertex{pos: [1.0, 0.0]},
-            Vertex{pos: [0.0, 1.0]},
-            Vertex{pos: [1.0, 1.0]}
-        ];
+        let mut buf = Vec::new();
+        for step in 0..=CIRCLE_SIZE {
+            let radians = (step as f32) / (CIRCLE_SIZE as f32) * (2.0 * std::f32::consts::PI);
+            let x = radians.sin();
+            let y = radians.cos();
+            buf.push(Vertex{pos: [x, y]}); // Inner circle vertex
+            buf.push(Vertex{pos: [x, y]}); // Outer circle vertex
+        }
         let vertex_buffer = renderer.device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: None,
             usage: wgpu::BufferUsages::VERTEX,
@@ -119,7 +124,7 @@ impl QuadRenderable {
             usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
             mapped_at_creation: false
         });
-        let pipeline = renderer.get_render_pipeline(super::RenderableType::Quad);
+        let pipeline = renderer.get_render_pipeline(ObjectType::Circle);
         let bind_group_layout = pipeline.get_bind_group_layout(0);
         let bind_group = renderer.device.create_bind_group(&wgpu::BindGroupDescriptor {
             label: None,
@@ -131,11 +136,11 @@ impl QuadRenderable {
                 }
             ]
         });
-        let params = QuadParameters {
+        let params = CircleParameters {
             x: mapping.get(RenderParam::X)?,
             y: mapping.get(RenderParam::Y)?,
-            width: mapping.get(RenderParam::Width)?,
-            height: mapping.get(RenderParam::Height)?,
+            radius: mapping.get(RenderParam::Radius)?,
+            line_width: mapping.get(RenderParam::LineWidth)?,
             r: mapping.get(RenderParam::R)?,
             g: mapping.get(RenderParam::G)?,
             b: mapping.get(RenderParam::B)?,
@@ -151,13 +156,14 @@ impl QuadRenderable {
     }
 }
 
-impl Renderable for QuadRenderable {
-    fn update(&mut self, audio_packet: &AudioPacket, renderer: &Renderer, _aspect_ratio: f32) {
+impl ObjectRenderable for CircleRenderable {
+    fn update(&mut self, renderer: &Renderer, audio_packet: &AudioPacket, aspect_ratio: f32) {
         let uniform_data = [
+            aspect_ratio,
             self.params.x.eval(audio_packet),
             self.params.y.eval(audio_packet),
-            self.params.width.eval(audio_packet),
-            self.params.height.eval(audio_packet),
+            self.params.radius.eval(audio_packet),
+            self.params.line_width.eval(audio_packet),
             self.params.r.eval(audio_packet),
             self.params.g.eval(audio_packet),
             self.params.b.eval(audio_packet)
